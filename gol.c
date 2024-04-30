@@ -1,4 +1,5 @@
 #include "gol.h"
+#include "console.h"
 #include <windows.h>
 #include <conio.h>
 
@@ -30,9 +31,9 @@ void print_board(
     uint32_t height)
 {
     if (width > BOARD_WIDTH)
-        width = BOARD_WIDTH;
+        width = BOARD_WIDTH - 1;
     if (height > HEIGHT)
-        height = HEIGHT;
+        height = HEIGHT - 1;
 
     char buf[BOARD_BUFSIZE];
 
@@ -158,33 +159,87 @@ void pause_gol(void)
 
     while (true)
     {
-        Sleep(10);
-
-        if (kbhit())
+        if (!kbhit())
         {
-            int ch = _getch();
+            Sleep(10);
+            continue;
+        }
 
-            switch (ch)
+        int ch = _getch();
+
+        switch (ch)
+        {
+            case 'P':
+            case 'p':
+                return;
+            case ARROW_KEY:
             {
-                case 'P':
-                case 'p':
-                    return;
-                case ARROW_KEY:
-                {
-                    handle_arrow_press(_getch(), &cursor_position, &d);
-                    break;
-                }
-                default:
-                {
-                    // clear stdout
-                    while (kbhit()) _getch();
-                }
+                handle_arrow_press(_getch(), &cursor_position, &d);
+                break;
+            }
+            default:
+            {
+                // clear stdout
+                while (kbhit()) _getch();
             }
         }
     }
 }
 
-void handle_keypress(void)
+void gol_settings(uint16_t *FPS_CAP)
+{
+    system("cls||clear");
+
+    printf("SETTINGS (save: 's'):\n");
+
+    if ((*FPS_CAP) < UINT16_MAX)
+        printf("FPS CAP: %u", *FPS_CAP);
+    else
+        printf("FPS CAP: Unlimited");
+    
+    fflush(stdout);
+    
+    while (true)
+    {
+        if (!kbhit())
+        {
+            Sleep(10);
+            continue;
+        }
+
+        int ch = getch();
+
+        if (ch == 's' || ch == 'S') break;
+        if (ch != ARROW_KEY) continue;
+
+        switch (getch())
+        {
+            case ARROW_UP:
+            {
+                (*FPS_CAP)++;
+                if (!(*FPS_CAP)) (*FPS_CAP) = 1;
+                break;
+            }
+            case ARROW_DOWN:
+            {
+                (*FPS_CAP)--;
+                if (!(*FPS_CAP)) (*FPS_CAP) = UINT16_MAX;
+                break;
+            }
+        }
+
+        if ((*FPS_CAP) < UINT16_MAX)
+            printf("\r                           \rFPS CAP: %u", *FPS_CAP);
+        else
+            printf("\r                           \rFPS CAP: Unlimited");
+        fflush(stdout);
+    }
+
+    // for now just clear the line
+    fputs("\r                                \r", stdout);
+}
+
+void handle_keypress(uint16_t *FPS_CAP)
 {
     int ch = _getch();
     
@@ -194,6 +249,12 @@ void handle_keypress(void)
         case 'p':
         {
             pause_gol();
+            break;
+        }
+        case 'S':
+        case 's':
+        {
+            gol_settings(FPS_CAP);
             break;
         }
         default:
@@ -211,9 +272,12 @@ int main(int argc, char *argv[])
 
     board b;
 
-    board_init(&b, 0.3);
+    board_init(&b, 0.6);
 
-    console_dimensions d;
+    console_dimensions d = get_console_dimensions();
+    console_dimensions d_sav = d;
+
+    uint16_t FPS_CAP = 15;
 
     uint32_t framerate = 0;
     uint64_t frames = 0;
@@ -222,7 +286,6 @@ int main(int argc, char *argv[])
 
     while (true)
     {
-        d = get_console_dimensions();
 
         if (difftime(time(0), capture))
         {
@@ -231,24 +294,33 @@ int main(int argc, char *argv[])
             capture++;
         }
 
+        // when console gets resized might aswell clear screen
+        if (d_sav.x != d.x || d_sav.y != d.y)
+        {
+            system("cls||clear");
+            d_sav = d;
+        }
+
         // redraw the board
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), (COORD) {0, 0});
 
         for (uint16_t i = 2; i < d.x + (BORDER_WIDTH << 1); i++) fputc(' ', stdout);
-        printf("\rFPS: %d\tIterations: %lld\tKeybinds --> Pause: 'p'\tNavigation: Arrow keys\n", framerate, frames);
+        printf("\rFPS: %d\tFrames: %lld\tKeybinds -> Pause: 'p'\tNavigation: Arrow keys\tSettings: s\tDimensions: %dx%d\n", framerate, frames, d.x, d.y);
         print_board(&b, d.x - 2, d.y - 3);
 
 
         if (kbhit())
-            handle_keypress();
+            handle_keypress(&FPS_CAP);
         
         // update the board for next iteration
         update_board(&b);
         frames++;
 
-        // bit less than 1000/FPS just because it needs a few milliseconds to print
+        d = get_console_dimensions();
+
+        // bit less than 1000/FPS_CAP just because it needs a few milliseconds to print
         // to the output, 925 seems like the best
-        Sleep(925/FPS);
+        if (FPS_CAP < 1800) Sleep(925/FPS_CAP);
     }
 
     return 0;

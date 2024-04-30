@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -6,16 +8,8 @@
 #include <time.h>
 
 
-#define FPS 15
-
-#if FPS > 1000
-#define CLOCK_CYCLES 1000
-#else
-#define CLOCK_CYCLES FPS
-#endif
-
-#define WIDTH 250
-#define HEIGHT 100
+#define WIDTH 1500
+#define HEIGHT 400
 
 #define BOARD_CELLS_WIDTH ((WIDTH + 7) >> 3)
 #define BOARD_LENGTH (BOARD_CELLS_WIDTH * HEIGHT)
@@ -87,24 +81,3 @@ void print_board(
 uint8_t get_cell_neighbours_line(
     board *b,
     uint32_t idx);
-
-typedef struct console_dimensions
-{
-    uint32_t x;
-    uint32_t y;
-} console_dimensions;
-
-inline console_dimensions
-get_console_dimensions(void)
-{
-    CONSOLE_SCREEN_BUFFER_INFO csbi;
-    uint32_t x, y;
-
-    if (!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi))
-        return (console_dimensions){WIDTH, HEIGHT};
-    
-    x = csbi.srWindow.Right - csbi.srWindow.Left + 1;
-    y = csbi.srWindow.Bottom - csbi.srWindow.Top + 1;
-
-    return (console_dimensions){x, y};
-}
